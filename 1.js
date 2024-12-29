@@ -1,50 +1,48 @@
 const numbers = [1, 2, 3, 4, 5];
 
+const once = (fn) => {
+  let called = false;
+  return (...args) => {
+    if (called) return;
+    called = true;
+    return fn(...args);
+  };
+};
 
-function asyncMap(array, asyncCallback, finalCallback) {
-  const results = [];
-  let pending = array.length;
-
+const asyncMap = (array, process, onFinish) => {
   if (array.length === 0) {
-    finalCallback(null, results);
+    onFinish(null, []);
     return;
   }
 
+  const result = Array(array.length);
+  let completed = 0;
+  let finished = false;
+
   array.forEach((item, index) => {
-    asyncCallback(item, index, array, (err, result) => {
-      if (err) {
-        finalCallback(err);
+    process(item, once((error, processed) => {
+      if (finished) return;
+
+      if (error) {
+        finished = true;
+        onFinish(error, null);
         return;
       }
 
-      results[index] = result;
-      pending--;
+      result[index] = processed;
+      completed++;
 
-      if (pending === 0) {
-        finalCallback(null, results);
+      if (completed === array.length) {
+        onFinish(null, result);
       }
-    });
+    }));
   });
-}
+};
 
+const doubleAsync = (item, callback) => {
+  setTimeout(() => callback(null, item * 2), 1000);
+};
 
-function doubleAsync(num, index, array, callback) {
-  setTimeout(() => {
-    if (num < 0) {
-      callback(new Error("Negative numbers are not allowed"));
-    } else {
-      callback(null, num * 2);
-    }
-  }, 100);
-}
-
-
-function handleResults(err, results) {
-  if (err) {
-    console.error("Error:", err.message);
-  } else {
-    console.log("Results:", results);
-  }
-}
-
-asyncMap(numbers, doubleAsync, handleResults);
+asyncMap(numbers, doubleAsync, (error, result) => {
+  console.log({ error, result });
+});
